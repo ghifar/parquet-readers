@@ -1,17 +1,16 @@
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.*;
-import org.apache.spark.sql.connector.expressions.Lit;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class Main {
     public static void main(String[] args) {
-        SparkConf conf = new SparkConf().setAppName("appName").setMaster("local[*]");
-        JavaSparkContext sc = new JavaSparkContext(conf);
+        final String datalakePath = "{YOUR DATA PATH}";
+        final SparkConf conf = new SparkConf().setAppName("appName").setMaster("local[*]");
+        final JavaSparkContext sc = new JavaSparkContext(conf);
 
         SparkSession sp = SparkSession.builder()
                 .appName("oke")
@@ -19,21 +18,22 @@ public class Main {
                 .config("spark.sql.caseSensitive", "true").getOrCreate();
 
         Dataset<Row> df = sp.read()
-                .parquet("parquet-directory-or-files")
+                .parquet(datalakePath)
                 .coalesce(1);
 
 
         /* EXAMPLE
-        * Uncomment to try the function */
+         * Uncomment to try the function */
 
         // 1. to print schema only
         df.printSchema();
 
         // 2. example this is to select any columns
+        df.select("*").show();
         //df.select("`de_sales.settlement_invoice.original_attributes`").show(10, false);
 
         // 3. export to csv. output folder should in this directory project root
-        //toCsv(df.filter("`product.product_source_list.vendor_id`"), "*");
+        //generateFile(df.filter("`product.product_source_list.vendor_id`"), "*", CSV);
 
         // 4. to print only contains word in params
         //printContains(df, "de_sales.settlement_invoice.original_attributes");
@@ -70,16 +70,33 @@ public class Main {
                 .show(10000, false);
     }
 
+
     /**
-     * @param df
-     * @param column -> * or name of the column
+     * This will generate file based on given output format to root of this project
+     *
+     * @param df           dataframe
+     * @param column       column that we need to generate, put '*' if you want print all cols
+     * @param outputFormat {@link OutputFormat} enum
      */
-    static void toCsv(Dataset<Row> df, String column) {
-        df.select(column)
+    static void generateFile(Dataset<Row> df, String column, OutputFormat outputFormat) {
+        final DataFrameWriter<?> result = df.select(column)
                 .write()
                 .mode(SaveMode.Overwrite)
-                .option("header", "true")
-                .csv("csv-output");
+                .option("header", "true");
 
+        switch (outputFormat) {
+            case CSV:
+                result.csv("csv-output");
+                break;
+            case JSON:
+                result.json("json-output");
+                break;
+            default:
+                System.out.println("Unknown output format!");
+        }
+    }
+
+    enum OutputFormat {
+        CSV, JSON
     }
 }
